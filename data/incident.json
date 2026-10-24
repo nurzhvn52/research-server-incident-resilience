@@ -1,0 +1,23 @@
+{
+  "note": "Synthetic educational data copied from the Assignment 4 template; not a real AITU or Kazakhstan university incident.",
+  "events": [
+    {"time": "09:01", "event": "15 failed logins", "source": "10.20.4.15", "severity": "Medium"},
+    {"time": "09:03", "event": "21 failed logins", "source": "10.20.4.15", "severity": "High"},
+    {"time": "09:04", "event": "Successful login", "source": "10.20.4.15", "severity": "High"},
+    {"time": "09:07", "event": "320 files modified", "source": "10.20.4.15", "severity": "Critical"},
+    {"time": "09:08", "event": "CPU usage increased to 95%", "source": "Research-Server-01", "severity": "High"},
+    {"time": "09:10", "event": "1,200 files encrypted", "source": "Research-Server-01", "severity": "Critical"},
+    {"time": "09:12", "event": "Backup deletion attempt", "source": "Research-Server-01", "severity": "Critical"},
+    {"time": "09:13", "event": "Outbound connection to unknown IP", "source": "Research-Server-01", "severity": "High"},
+    {"time": "09:15", "event": "Database access spike", "source": "Research-Server-01", "severity": "High"},
+    {"time": "09:18", "event": "Antivirus disabled", "source": "Research-Server-01", "severity": "Critical"}
+  ],
+  "anomaly_threshold": 0.75,
+  "scores": [
+    {"signal": "Login failures", "normal": 0.10, "observed": 0.81},
+    {"signal": "File modifications", "normal": 0.12, "observed": 0.96},
+    {"signal": "CPU usage", "normal": 0.20, "observed": 0.88},
+    {"signal": "Outbound traffic", "normal": 0.15, "observed": 0.79},
+    {"signal": "Database requests", "normal": 0.18, "observed": 0.91}
+  ]
+}

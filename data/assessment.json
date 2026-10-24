@@ -1,0 +1,172 @@
+{
+  "stages": {
+    "09:01": {
+      "stage": "credential attack",
+      "evidence": "15 failures from one source within a minute; the address is private campus space, so the guessing host is already inside the network (inference, no flow logs to confirm).",
+      "risk": "Medium"
+    },
+    "09:03": {
+      "stage": "credential attack",
+      "evidence": "A larger second wave (21 after 15) from the same source: 36 failures in 3 minutes and nothing stopped them, so there was no effective lockout.",
+      "risk": "High"
+    },
+    "09:04": {
+      "stage": "privilege compromise",
+      "evidence": "First success from the guessing address, one minute after 36 failures: the password was found and the account is now in the attacker's hands. No second factor is visible. Raised from the dataset's High because this is the moment prevention failed.",
+      "risk": "Critical"
+    },
+    "09:07": {
+      "stage": "data destruction",
+      "evidence": "Bulk modification of 320 files from the attacker's own address 3 minutes after the login: the first change to data, before any host-side symptom.",
+      "risk": "Critical"
+    },
+    "09:08": {
+      "stage": "data destruction",
+      "evidence": "CPU rises on the server itself one minute after the first bulk writes, consistent with an encryption routine. Weak alone (research jobs also load the CPU), strong in this sequence.",
+      "risk": "High"
+    },
+    "09:10": {
+      "stage": "data destruction",
+      "evidence": "Encryption is confirmed: 1,200 files, 3.75 times the 320 of 09:07; if the counts are cumulative, about 290 files per minute.",
+      "risk": "Critical"
+    },
+    "09:12": {
+      "stage": "recovery attack",
+      "evidence": "An attempt to delete the backups two minutes after encryption began: it only makes sense if the attacker wants the victim unable to restore. It also shows the backups were reachable from the compromised server. The outcome is not in the dataset.",
+      "risk": "Critical"
+    },
+    "09:13": {
+      "stage": "exfiltration",
+      "evidence": "First outbound connection of the incident, to an address in no allowlist. It is either data leaving or a command channel; no byte count is given, so I treat it as exfiltration for risk purposes (worst case).",
+      "risk": "High"
+    },
+    "09:15": {
+      "stage": "exfiltration",
+      "evidence": "Bulk reading of the database two minutes after the outbound channel opened: staging data for theft. The alternative reading, lateral movement, is rejected because no new host or identity appears.",
+      "risk": "High"
+    },
+    "09:18": {
+      "stage": "persistence",
+      "evidence": "Antivirus switched off 8 minutes after encryption started: it needs administrator rights, and it protects the attacker's files from clean-up. It also means antivirus raised nothing during 09:07-09:10.",
+      "risk": "Critical"
+    }
+  },
+  "unused_stages": {
+    "reconnaissance": "No event shows scanning. The attacker's host is already inside the network and the dataset has no network-flow logs, so this is a visibility gap, not proof that it did not happen.",
+    "lateral movement": "The step from 10.20.4.15 to Research-Server-01 is itself lateral movement from an already compromised host, but the dataset shows only the target side, so events are classified by what happened to the server."
+  },
+  "threats": [
+    {
+      "threat": "Credential compromise",
+      "likelihood": 5,
+      "impact": 4,
+      "why_likelihood": "Confirmed: a login succeeded at 09:04 after 36 failures from one source and nothing stopped the guessing (no effective lockout, no second factor).",
+      "why_impact": "It opened the way for every later stage, but by itself it gives only what the account may do; the damage is scored in the threats below.",
+      "residual": {"likelihood": 2, "impact": 3, "why": "MFA and lockout make guessing useless; what remains is a phished second factor or a stolen session. Access goes through the bastion with least privilege, so a stolen account reaches less."}
+    },
+    {
+      "threat": "Ransomware",
+      "likelihood": 5,
+      "impact": 5,
+      "why_likelihood": "Confirmed: 320 files modified at 09:07 and 1,200 encrypted at 09:10.",
+      "why_impact": "Research data and the server's services are lost until restored, and the backups were attacked at the same time (09:12).",
+      "residual": {"likelihood": 3, "impact": 3, "why": "It cannot be excluded (e-mail, USB, another host). Impact is bounded: alert in 1 minute, isolation in 3, restore from a clean snapshot in 27 minutes, at most 4.5 minutes of data lost."}
+    },
+    {
+      "threat": "Backup destruction",
+      "likelihood": 4,
+      "impact": 5,
+      "why_likelihood": "A deletion attempt was logged at 09:12; the result is unknown, and a backup reachable from the compromised server is likely to be deletable, so one step below certain.",
+      "why_impact": "If it succeeds, every other incident becomes unrecoverable and neither RPO nor RTO can be met.",
+      "residual": {"likelihood": 1, "impact": 4, "why": "Immutable storage, pull-based backups and separate credentials leave only a failure of the storage itself or two colluding approvers. The offline copy keeps the impact at 4: an older state survives, but it loses more than the RPO."}
+    },
+    {
+      "threat": "Data exfiltration",
+      "likelihood": 4,
+      "impact": 4,
+      "why_likelihood": "Two indirect signs, an outbound connection to an unknown IP (09:13) and a database access spike (09:15); no byte volume, so likely but not proven.",
+      "why_impact": "Research data and possibly personal data of participants leave the university's control, and a backup cannot restore confidentiality; the volume is unknown, so not 5.",
+      "residual": {"likelihood": 3, "impact": 4, "why": "Egress allowlist and query limits reduce it, but an encrypted channel to an allowed host or a theft by an authorised user remains. Impact stays 4 because recovery controls do not restore confidentiality; this is the largest residual risk."}
+    },
+    {
+      "threat": "Privilege escalation",
+      "likelihood": 3,
+      "impact": 4,
+      "why_likelihood": "Disabling antivirus (09:18) and touching backups need administrator rights, but the log shows no explicit escalation: either the account was already over-privileged or it escalated unseen.",
+      "why_impact": "Administrator rights let the attacker switch off defences and reach the backups; the effect is large but is counted again in the ransomware and backup threats, so not 5.",
+      "residual": {"likelihood": 2, "impact": 3, "why": "No standing administrator rights (just-in-time through the bastion), tamper protection on the agents, separate roles for antivirus and backup administration."}
+    }
+  ],
+  "controls": [
+    {
+      "threat": "Credential attack",
+      "preventive": "MFA (FIDO2 key or TOTP) for every login through the identity provider; lockout after 5 failures; SSH/RDP of Research-Server-01 reachable only from the bastion.",
+      "detective": "SIEM rules: 5 or more failures per minute from one source; a success after 10 or more failures from the same source; alert to the SOC on duty.",
+      "recovery": "Revoke the account's sessions, force a password reset and new MFA enrolment; if the host was touched, restore it from a clean snapshot."
+    },
+    {
+      "threat": "Ransomware",
+      "preventive": "EDR with application allowlisting and tamper protection; user VLANs have no direct path to the research segment; research files are written by service accounts with minimal rights.",
+      "detective": "Canary files and file-integrity monitoring (alert on the first changed canary); write-rate and entropy rule; AI anomaly score on file modifications.",
+      "recovery": "Isolate the host, restore the last clean snapshot from the immutable repository into the recovery environment, verify it, then fail over."
+    },
+    {
+      "threat": "Backup deletion",
+      "preventive": "Immutable repository (object lock, 14-day retention); backups are pulled by the backup server, so the research server holds no delete rights; shortening retention needs two approvers.",
+      "detective": "Alert on any delete or retention-change call, and on a missing snapshot (nothing new within 2 intervals).",
+      "recovery": "Restore from the offline second-site copy if the immutable tier is damaged."
+    },
+    {
+      "threat": "Data exfiltration",
+      "preventive": "Default-deny outbound firewall with an allowlist; DNS filtering; the database is reached through a service account with a query-rate limit; data at rest encrypted with keys held outside the server.",
+      "detective": "NetFlow and NIDS alerts on new destinations and on volume; query-rate alert on the database; AI anomaly score on outbound traffic.",
+      "recovery": "Block the destination, rotate keys and credentials, scope from the logs what left, and report to the university security office and, where required, KZ-CERT."
+    },
+    {
+      "threat": "Privilege escalation",
+      "preventive": "Least privilege and no shared administrator accounts; administrator rights granted just-in-time through the bastion with MFA; separate roles for antivirus and backup administration.",
+      "detective": "Alerts on administrator group changes, new administrator sessions, and any stop or disabling of the EDR agent.",
+      "recovery": "Rebuild the host from the golden image and rotate all privileged credentials."
+    }
+  ],
+  "coverage": [
+    {"time": "09:01", "preventive": "Lockout after the 5th failure", "detective": "SIEM brute-force rule"},
+    {"time": "09:03", "preventive": "Source throttled at the firewall by the SOAR playbook", "detective": "SIEM brute-force rule (repeat)"},
+    {"time": "09:04", "preventive": "MFA: the password alone gives no session", "detective": "Success-after-failures rule"},
+    {"time": "09:07", "preventive": "Bastion-only access, least-privilege file rights", "detective": "Canary file and file-integrity alert"},
+    {"time": "09:08", "preventive": "EDR behaviour blocking", "detective": "AI score on CPU and process activity"},
+    {"time": "09:10", "preventive": "Isolation of the host (recovery step 2)", "detective": "Write-rate and entropy rule"},
+    {"time": "09:12", "preventive": "Immutable repository refuses the delete", "detective": "Delete-call alert"},
+    {"time": "09:13", "preventive": "Default-deny egress blocks the connection", "detective": "NIDS new-destination alert"},
+    {"time": "09:15", "preventive": "Service-account query-rate limit", "detective": "Database query-rate alert"},
+    {"time": "09:18", "preventive": "EDR tamper protection needs a token", "detective": "Agent-stop alert"}
+  ],
+  "recovery": {
+    "steps": [
+      {"step": 1, "action": "Detect incident", "component": "SIEM correlation + canary/file-integrity alert + AI scorer; SOC on duty confirms", "start_s": 0, "duration_s": 60},
+      {"step": 2, "action": "Isolate affected system", "component": "SOAR playbook: firewall quarantine VLAN, identity provider revokes sessions, egress blocked", "start_s": 60, "duration_s": 120},
+      {"step": 3, "action": "Preserve evidence", "component": "EDR memory capture + hypervisor disk snapshot to a write-once evidence store; SOC analyst", "start_s": 180, "duration_s": 300},
+      {"step": 4, "action": "Activate backup", "component": "Backup orchestrator picks the newest clean snapshot in the immutable repository and brings up Research-Server-02 in the recovery environment", "start_s": 180, "duration_s": 300},
+      {"step": 5, "action": "Restore services", "component": "Backup orchestrator restores the hot dataset and the database into the recovery environment; cold data follows after production", "start_s": 480, "duration_s": 480},
+      {"step": 6, "action": "Verify integrity", "component": "Integrity verifier: signed hash manifest, malware scan of changed files, database consistency check, canary files; security lead signs off", "start_s": 960, "duration_s": 420},
+      {"step": 7, "action": "Return to production", "component": "Failover controller moves the load balancer and DNS to Research-Server-02; identity provider re-enables access with MFA; SOC watches closely", "start_s": 1380, "duration_s": 240}
+    ],
+    "parameters": {
+      "rpo_target_s": 300,
+      "rto_target_s": 1800,
+      "snapshot_interval_s": 60,
+      "ship_lag_s": 30,
+      "hot_set_gb": 300,
+      "restore_throughput_gb_s": 0.8,
+      "t0_event": "09:07 (first file modified)"
+    }
+  },
+  "recommendation": {
+    "mechanism": "An offline (air-gapped) copy of the research data at a second site inside Kazakhstan, refreshed daily and restore-tested every quarter.",
+    "why": [
+      "The immutable repository is still online: a compromised backup administrator, a flaw in the storage software or a fire in the server room defeats it. An offline copy at another site is the only layer that none of these reach.",
+      "Research datasets with participant data should stay on servers in Kazakhstan (to be confirmed with the university's legal and IT security office), so a foreign cloud is not a free fallback; a partner university or the national research network is.",
+      "It is cheap for a university: a weekly or daily rotation of a disk or tape set, no new software, and the restore drill is the proof that it works."
+    ]
+  }
+}

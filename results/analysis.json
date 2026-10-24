@@ -1,0 +1,259 @@
+{
+  "stages": {
+    "counts": {
+      "credential attack": 2,
+      "data destruction": 3,
+      "exfiltration": 2,
+      "persistence": 1,
+      "privilege compromise": 1,
+      "recovery attack": 1
+    },
+    "raised": [
+      "09:04"
+    ]
+  },
+  "risk": {
+    "rows": [
+      {
+        "threat": "Credential compromise",
+        "likelihood": 5,
+        "impact": 4,
+        "score": 20,
+        "level": "Critical",
+        "residual_likelihood": 2,
+        "residual_impact": 3,
+        "residual_score": 6,
+        "residual_level": "Medium",
+        "priority": 3
+      },
+      {
+        "threat": "Ransomware",
+        "likelihood": 5,
+        "impact": 5,
+        "score": 25,
+        "level": "Critical",
+        "residual_likelihood": 3,
+        "residual_impact": 3,
+        "residual_score": 9,
+        "residual_level": "Medium",
+        "priority": 1
+      },
+      {
+        "threat": "Backup destruction",
+        "likelihood": 4,
+        "impact": 5,
+        "score": 20,
+        "level": "Critical",
+        "residual_likelihood": 1,
+        "residual_impact": 4,
+        "residual_score": 4,
+        "residual_level": "Low",
+        "priority": 2
+      },
+      {
+        "threat": "Data exfiltration",
+        "likelihood": 4,
+        "impact": 4,
+        "score": 16,
+        "level": "High",
+        "residual_likelihood": 3,
+        "residual_impact": 4,
+        "residual_score": 12,
+        "residual_level": "High",
+        "priority": 4
+      },
+      {
+        "threat": "Privilege escalation",
+        "likelihood": 3,
+        "impact": 4,
+        "score": 12,
+        "level": "High",
+        "residual_likelihood": 2,
+        "residual_impact": 3,
+        "residual_score": 6,
+        "residual_level": "Medium",
+        "priority": 5
+      }
+    ],
+    "ties": [
+      20
+    ],
+    "total": 93,
+    "residual_total": 37,
+    "reduction_pct": 60.2
+  },
+  "recovery": {
+    "steps": [
+      {
+        "step": 1,
+        "action": "Detect incident",
+        "component": "SIEM correlation + canary/file-integrity alert + AI scorer; SOC on duty confirms",
+        "start_s": 0,
+        "duration_s": 60,
+        "end_s": 60
+      },
+      {
+        "step": 2,
+        "action": "Isolate affected system",
+        "component": "SOAR playbook: firewall quarantine VLAN, identity provider revokes sessions, egress blocked",
+        "start_s": 60,
+        "duration_s": 120,
+        "end_s": 180
+      },
+      {
+        "step": 3,
+        "action": "Preserve evidence",
+        "component": "EDR memory capture + hypervisor disk snapshot to a write-once evidence store; SOC analyst",
+        "start_s": 180,
+        "duration_s": 300,
+        "end_s": 480
+      },
+      {
+        "step": 4,
+        "action": "Activate backup",
+        "component": "Backup orchestrator picks the newest clean snapshot in the immutable repository and brings up Research-Server-02 in the recovery environment",
+        "start_s": 180,
+        "duration_s": 300,
+        "end_s": 480
+      },
+      {
+        "step": 5,
+        "action": "Restore services",
+        "component": "Backup orchestrator restores the hot dataset and the database into the recovery environment; cold data follows after production",
+        "start_s": 480,
+        "duration_s": 480,
+        "end_s": 960
+      },
+      {
+        "step": 6,
+        "action": "Verify integrity",
+        "component": "Integrity verifier: signed hash manifest, malware scan of changed files, database consistency check, canary files; security lead signs off",
+        "start_s": 960,
+        "duration_s": 420,
+        "end_s": 1380
+      },
+      {
+        "step": 7,
+        "action": "Return to production",
+        "component": "Failover controller moves the load balancer and DNS to Research-Server-02; identity provider re-enables access with MFA; SOC watches closely",
+        "start_s": 1380,
+        "duration_s": 240,
+        "end_s": 1620
+      }
+    ],
+    "rto_s": 1620,
+    "rto_target_s": 1800,
+    "rto_margin_s": 180,
+    "rpo_worst_case_s": 270,
+    "rpo_target_s": 300,
+    "rpo_margin_s": 30,
+    "rpo_by_snapshot_interval_s": {
+      "30": 240,
+      "60": 270,
+      "120": 330,
+      "300": 510
+    },
+    "restore_hot_set_s": 375,
+    "restore_budget_s": 480,
+    "isolation_done_s": 180,
+    "parameters": {
+      "rpo_target_s": 300,
+      "rto_target_s": 1800,
+      "snapshot_interval_s": 60,
+      "ship_lag_s": 30,
+      "hot_set_gb": 300,
+      "restore_throughput_gb_s": 0.8,
+      "t0_event": "09:07 (first file modified)"
+    }
+  },
+  "anomalies": {
+    "rows": [
+      {
+        "signal": "Login failures",
+        "normal": 0.1,
+        "observed": 0.81,
+        "delta": 0.71,
+        "ratio": 8.1,
+        "margin": 0.06,
+        "anomaly": true
+      },
+      {
+        "signal": "File modifications",
+        "normal": 0.12,
+        "observed": 0.96,
+        "delta": 0.84,
+        "ratio": 8.0,
+        "margin": 0.21,
+        "anomaly": true
+      },
+      {
+        "signal": "CPU usage",
+        "normal": 0.2,
+        "observed": 0.88,
+        "delta": 0.68,
+        "ratio": 4.4,
+        "margin": 0.13,
+        "anomaly": true
+      },
+      {
+        "signal": "Outbound traffic",
+        "normal": 0.15,
+        "observed": 0.79,
+        "delta": 0.64,
+        "ratio": 5.27,
+        "margin": 0.04,
+        "anomaly": true
+      },
+      {
+        "signal": "Database requests",
+        "normal": 0.18,
+        "observed": 0.91,
+        "delta": 0.73,
+        "ratio": 5.06,
+        "margin": 0.16,
+        "anomaly": true
+      }
+    ],
+    "threshold": 0.75,
+    "detected": 5,
+    "total": 5,
+    "rate_pct": 100.0,
+    "normal_flagged": 0,
+    "mean_normal": 0.15,
+    "mean_observed": 0.87,
+    "highest": "File modifications",
+    "ranking": [
+      "File modifications",
+      "Database requests",
+      "CPU usage",
+      "Login failures",
+      "Outbound traffic"
+    ],
+    "sensitivity": {
+      "0.70": {
+        "detected": 5,
+        "rate_pct": 100
+      },
+      "0.75": {
+        "detected": 5,
+        "rate_pct": 100
+      },
+      "0.80": {
+        "detected": 4,
+        "rate_pct": 80
+      },
+      "0.85": {
+        "detected": 3,
+        "rate_pct": 60
+      },
+      "0.90": {
+        "detected": 2,
+        "rate_pct": 40
+      },
+      "0.95": {
+        "detected": 1,
+        "rate_pct": 20
+      }
+    }
+  }
+}
